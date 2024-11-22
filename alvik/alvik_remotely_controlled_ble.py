@@ -12,18 +12,16 @@ import asyncio
 import aioble
 
 
-MIN_DISTANCE = 6 
-TIMEOUT = 1000
 ADV_NAME = "ALVIK_REMOTE_CONTROLLER"
 
 _BLE_SERVICE_UUID = bluetooth.UUID('19b10000-e8f2-537e-4f6c-d104768a1214')
-_BLE_SPEED_CHAR_UUID = bluetooth.UUID('19b10001-e8f2-537e-4f6c-d104768a1214')
+_BLE_SPEED_UUID = bluetooth.UUID('19b10001-e8f2-537e-4f6c-d104768a1214')
 _BLE_LED_UUID = bluetooth.UUID('19b10002-e8f2-537e-4f6c-d104768a1214')
-
-message_received = -TIMEOUT
+_BLE_STEERING_UUID = bluetooth.UUID('19b10003-e8f2-537e-4f6c-d104768a1214')
 
 left_speed = 0
 right_speed = 0
+SPEED_FACTOR = 0.7
 
 
 # Initialize Alvik
@@ -62,12 +60,14 @@ async def find_tx_device():
 
 async def main():
     print("In main")
+    alvik.brake()
+    alvik.left_led.set_color(1, 0, 0)
     device = await find_tx_device()
     while not device:
         print("Speed sensor not found")
         device = await find_tx_device()
         await asyncio.sleep_ms(2000)
-#        return
+        # return
 
     try:
         print("Connecting to", device)
@@ -80,16 +80,29 @@ async def main():
         
         try:
             dev_service = await connection.service(_BLE_SERVICE_UUID)
-            speed_characteristic = await dev_service.characteristic(_BLE_SPEED_CHAR_UUID)
+            speed_characteristic = await dev_service.characteristic(_BLE_SPEED_UUID)
+            steering_characteristic = await dev_service.characteristic(_BLE_STEERING_UUID)
             while connection.is_connected():
+                alvik.left_led.set_color(0, 1, 0)
               
                 speed_as_bytes = await speed_characteristic.read()
                 speed = _decode_data(speed_as_bytes)
-                print("Speed is: ", speed)
-                alvik.set_wheels_speed(speed * 0.3, speed * 0.3)
+
+                dir_as_bytes = await steering_characteristic.read()
+                dir = _decode_data(dir_as_bytes)
+
+                left_wheel_speed = (speed + (speed * (dir/100))) * SPEED_FACTOR
+                right_wheel_speed = (speed - (speed * (dir/100))) * SPEED_FACTOR
+                print("Speed is: ", speed, left_wheel_speed, left_wheel_speed)
+                
+                
+                
+                alvik.set_wheels_speed(left_wheel_speed, right_wheel_speed)
         except asyncio.TimeoutError:
             print("Timeout discovering services/characteristics")
             print("Disconnected, should stop the robot for safety reason")
+            alvik.left_led.set_color(1, 0, 0)
+            alvik.brake()
             return
                 
     
