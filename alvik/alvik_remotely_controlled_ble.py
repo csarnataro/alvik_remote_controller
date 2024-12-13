@@ -18,6 +18,7 @@ _BLE_SERVICE_UUID = bluetooth.UUID('19b10000-e8f2-537e-4f6c-d104768a1214')
 _BLE_SPEED_UUID = bluetooth.UUID('19b10001-e8f2-537e-4f6c-d104768a1214')
 _BLE_LED_UUID = bluetooth.UUID('19b10002-e8f2-537e-4f6c-d104768a1214')
 _BLE_STEERING_UUID = bluetooth.UUID('19b10003-e8f2-537e-4f6c-d104768a1214')
+_BLE_HORN_UUID = bluetooth.UUID('19b10004-e8f2-537e-4f6c-d104768a1214')
 
 left_speed = 0
 right_speed = 0
@@ -57,6 +58,8 @@ async def find_tx_device():
                return result.device
     return None
 
+# async def horn_task():
+    
 
 async def main():
     print("In main")
@@ -85,6 +88,8 @@ async def main():
             while connection.is_connected():
                 alvik.left_led.set_color(0, 1, 0)
               
+                horn = await speed_characteristic.read()
+                print("HORN: ", horn)
                 speed_as_bytes = await speed_characteristic.read()
                 speed = _decode_data(speed_as_bytes)
 
@@ -104,9 +109,7 @@ async def main():
             alvik.left_led.set_color(1, 0, 0)
             alvik.brake()
             return
-                
-    
-    
+                    
 asyncio.run(main())
 
 
