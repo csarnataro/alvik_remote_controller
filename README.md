@@ -69,10 +69,13 @@ and the [Arduino Nano RP2040 Connect page](https://micropython.org/download/ARDU
 
 ### 3. Have fun
 
+The Arduino Alvik robot is powered by its own internal battery. 
+For the remote controller you can use a USB Power Bank connected 
+to the Arduino Nano RP2040 Connect's Micro USB port.
+
 If everything is working as expected, you should be able to turn you Alvik on and make it run like this:
 
 ![Alvik running](readme-images/alvik-running.gif)
-
 
 
 ### Technical details
@@ -91,6 +94,6 @@ A buzzer will play a melody each time the red button is pushed.
 - a buzzer (a ModuinoBuzzer module, actually) will play a melody each time the red button is pushed.
 - when the yellow button is pushed, some light effects are created on the ModulinoPixels module
 
-Open points: 
+(Optional) Next steps, PRs are welcome: 
 - implement automatic reconnection to bluetooth 
 - stop when an obstacle is detected
