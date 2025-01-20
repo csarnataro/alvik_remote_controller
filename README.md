@@ -62,7 +62,7 @@ and the [Arduino Nano RP2040 Connect page](https://micropython.org/download/ARDU
     The result should be similar to this:
     ![Python files have been copyed onto the board](readme-images/files-copied.png)
 
-    Reset your board using the small white button near the USB port. A new automatically generated file named `ble_secrets.json` 
+    Reset your board using the small white botton near the USB port. A new automatically genereted file named `ble_secrets.json` 
     has been created by `aioble` module. This is expected, it's a how `aioble` stores and manages BLE related secret keys.
 
 6. Repeat steps 3-5 for the Arduino Nano ESP32 board, only choose the `alvik` folder this time.
@@ -90,9 +90,10 @@ A buzzer will play a melody each time the red button is pushed.
 
 ## Features: 
 - control Alvik just by tilting the controller back/forward and left/right 
-- a buzzer will play a melody each time the red button is pushed.
+- it stops when it loose connection with the remote controller 
+- a buzzer (a ModuinoBuzzer module, actually) will play a melody each time the red button is pushed.
+- when the yellow button is pushed, some light effects are created on the ModulinoPixels module
 
 (Optional) Next steps, PRs are welcome: 
 - implement automatic reconnection to bluetooth 
 - stop when an obstacle is detected
-- (optional) make the LEDs blink when the yellow button is pushed

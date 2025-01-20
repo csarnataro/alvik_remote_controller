@@ -44,6 +44,9 @@ led_on = 0
 button_pin = 19
 button = Pin(button_pin, Pin.IN, Pin.PULL_UP)
 
+pixels_button_pin = 16
+pixels_button = Pin(pixels_button_pin, Pin.IN, Pin.PULL_UP)
+
 # Increase to make Alvik run faster
 SPEED_FACTOR = 100
 
@@ -62,7 +65,7 @@ _BLE_SPEED_UUID = bluetooth.UUID('19b10001-e8f2-537e-4f6c-d104768a1214')
 _BLE_LED_UUID = bluetooth.UUID('19b10002-e8f2-537e-4f6c-d104768a1214')
 _BLE_STEERING_UUID = bluetooth.UUID('19b10003-e8f2-537e-4f6c-d104768a1214')
 _BLE_HORN_UUID = bluetooth.UUID('19b10004-e8f2-537e-4f6c-d104768a1214')
-
+_BLE_PIXELS_UUID = bluetooth.UUID('19b10005-e8f2-537e-4f6c-d104768a1214')
 
 # How frequently to send advertising beacons.
 _ADV_INTERVAL_MS = 250_000
@@ -73,6 +76,7 @@ speed_characteristic = aioble.Characteristic(ble_service, _BLE_SPEED_UUID, read=
 steering_characteristic = aioble.Characteristic(ble_service, _BLE_STEERING_UUID, read=True, notify=True)
 led_characteristic = aioble.Characteristic(ble_service, _BLE_LED_UUID, read=True, write=True, notify=True, capture=True)
 horn_characteristic = aioble.Characteristic(ble_service, _BLE_HORN_UUID, read=True, write=True, notify=True, capture=True)
+pixels_characteristic = aioble.Characteristic(ble_service, _BLE_PIXELS_UUID, read=True, write=True, notify=True, capture=True)
 
 aioble.register_services(ble_service)
 
@@ -105,6 +109,21 @@ async def button_task():
             horn_characteristic.write(_encode_data(0), send_update=True)
 
         print('Horn sent to central: ', button_pressed)
+        await asyncio.sleep_ms(100)
+
+
+# Writes 0 or 1 to central, by updating the horn characteristic
+async def pixels_task():
+    while True:
+        button_pressed = pixels_button.value() == 0
+        if button_pressed:
+            led.value(1)
+            pixels_characteristic.write(_encode_data(1), send_update=True)
+        else:
+            led.value(0)
+            pixels_characteristic.write(_encode_data(0), send_update=True)
+
+        print('Pixels sent to central: ', button_pressed)
         await asyncio.sleep_ms(100)
 
 # Controls Alvik's speed.
@@ -146,11 +165,8 @@ async def main():
     t1 = asyncio.create_task(peripheral_task())
     t2 = asyncio.create_task(speed_task())
     t3 = asyncio.create_task(button_task())
+    t4 = asyncio.create_task(pixels_task())
     
-    await asyncio.gather(t1, t2, t3)
+    await asyncio.gather(t1, t2, t3, t4)
     
 asyncio.run(main())
-
-        
-
-

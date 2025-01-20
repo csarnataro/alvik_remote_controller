@@ -2,7 +2,7 @@ import network
 import sys
 from machine import I2C, Pin
 from arduino_alvik import ArduinoAlvik
-from modulino import ModulinoBuzzer
+from modulino import ModulinoBuzzer, ModulinoPixels, ModulinoColor
 from time import sleep_ms, sleep, ticks_ms, ticks_diff
 from math import cos, pi
 from melodies import pacman
@@ -19,6 +19,7 @@ _BLE_SPEED_UUID = bluetooth.UUID('19b10001-e8f2-537e-4f6c-d104768a1214')
 _BLE_LED_UUID = bluetooth.UUID('19b10002-e8f2-537e-4f6c-d104768a1214')
 _BLE_STEERING_UUID = bluetooth.UUID('19b10003-e8f2-537e-4f6c-d104768a1214')
 _BLE_HORN_UUID = bluetooth.UUID('19b10004-e8f2-537e-4f6c-d104768a1214')
+_BLE_PIXELS_UUID = bluetooth.UUID('19b10005-e8f2-537e-4f6c-d104768a1214')
 
 left_speed = 0
 right_speed = 0
@@ -30,9 +31,11 @@ SPEED_FACTOR = 0.7
 alvik = ArduinoAlvik()
 alvik.begin()
 buzzer = ModulinoBuzzer(I2C(0, scl=Pin(12, Pin.OUT), sda=Pin(11, Pin.OUT)))
+pixels = ModulinoPixels(I2C(0, scl=Pin(12, Pin.OUT), sda=Pin(11, Pin.OUT)))
 sleep(1)  # Waiting for the robot to setup
 
 is_playing = False
+is_pixels_on = False
 
 # Helper to decode the characteristic encoding (bytes).
 def _decode_data(data):
@@ -56,6 +59,16 @@ async def find_tx_device():
                return result.device
     return None
 
+async def pixels_task():
+    global is_pixels_on
+    while True:
+        if is_pixels_on:
+            await start_pixels_animation()
+            is_pixels_on = False
+        else:
+            await stop_pixels_animation()
+        await asyncio.sleep_ms(300)
+
 async def horn_task():
     global is_playing
     while True:
@@ -68,6 +81,7 @@ async def horn_task():
 
 async def speed_task():
     global is_playing
+    global is_pixels_on
     
     print("In speed_task")
     device = await find_tx_device()
@@ -90,6 +104,7 @@ async def speed_task():
             speed_characteristic = await dev_service.characteristic(_BLE_SPEED_UUID)
             steering_characteristic = await dev_service.characteristic(_BLE_STEERING_UUID)
             horn_characteristic = await dev_service.characteristic(_BLE_HORN_UUID)
+            pixels_characteristic = await dev_service.characteristic(_BLE_PIXELS_UUID)
             while connection.is_connected():
                 alvik.left_led.set_color(0, 1, 0)
               
@@ -98,6 +113,12 @@ async def speed_task():
 
                 if horn == 1:
                     is_playing = True
+                
+                
+                pixels_as_bytes = await pixels_characteristic.read()
+                pixels = _decode_data(pixels_as_bytes)
+                if pixels == 1: # we've received a "push" event
+                    is_pixels_on = not is_pixels_on
                 
                 
                 speed_as_bytes = await speed_characteristic.read()
@@ -116,13 +137,48 @@ async def speed_task():
             print("Disconnected, should stop the robot for safety reason")
             alvik.left_led.set_color(1, 0, 0)
             alvik.brake()
+            stop_pixels_animation()
             return
   
   
+async def stop_pixels_animation():
+    pixels.clear_all()
+    pixels.show()
+    
+async def start_pixels_animation():
+    global is_pixels_on
+    color = (255, 0, 0) # red color
+    wait = 50 # speed
+    barLength = 4 # how many pixels are lit at the same time, going back and forth
+    
 
-def play_tune(tune_function):
+    while True and is_pixels_on:
+        # Move the bar forward
+        for i in range(8):
+            for k in range(barLength):
+                if i + k < 8:
+                    pixels.set_rgb(i + k, *color)
+            pixels.show()
+            await asyncio.sleep_ms(wait)
+            for j in range(8):
+                pixels.clear(j)
+            
+        # Move the bar backward
+        for i in range(8 - 1, -1, -1):
+            for k in range(barLength):
+                if i - k >= 0:
+                    pixels.set_rgb(i - k, *color)
+            pixels.show()
+            await asyncio.sleep_ms(wait)
+            for j in range(8):
+                pixels.clear(j)
+                
+    stop_pixels_animation()
+    
 
-    tempo = 95
+async def play_tune(tune_function):
+
+    tempo = 105
     wholenote = int((60000 * 4) / tempo)
 
     divider = 0
@@ -142,15 +198,17 @@ def play_tune(tune_function):
         tune_function(ModulinoBuzzer.NOTES["REST"], blocking=False)
         await asyncio.sleep_ms(int(noteDuration * 0.1))
 
-  
+
 async def main():
     alvik.brake()
+    stop_pixels_animation()
     alvik.left_led.set_color(1, 0, 0)
     
     t1 = asyncio.create_task(speed_task())
     t2 = asyncio.create_task(horn_task())
+    t3 = asyncio.create_task(pixels_task())
     
-    await asyncio.gather(t1)
+    await asyncio.gather(t1, t2, t3)
   
 asyncio.run(main())
 
