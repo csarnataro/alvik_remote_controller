@@ -88,9 +88,9 @@ A buzzer will play a melody each time the red button is pushed.
 ## Features: 
 - control Alvik just by tilting the controller back/forward and left/right 
 - it stops when it loose connection with the remote controller 
-- a buzzer will play a melody each time the red button is pushed.
+- a buzzer (a ModuinoBuzzer module, actually) will play a melody each time the red button is pushed.
+- when the yellow button is pushed, some light effects are created on the ModulinoPixels module
 
 Open points: 
 - implement automatic reconnection to bluetooth 
 - stop when an obstacle is detected
-- (optional) make the LEDs blink when the yellow button is pushed
