@@ -161,8 +161,6 @@ async def peripheral_task():
 async def main():
     t1 = asyncio.create_task(peripheral_task())
     t2 = asyncio.create_task(speed_task())
-    # t3 = asyncio.create_task(button_task())
-    # t4 = asyncio.create_task(pixels_task())
     
     await asyncio.gather(t1, t2)
     
