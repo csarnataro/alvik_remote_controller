@@ -30,12 +30,16 @@ __version__ = "1.0.0"
 
 import time
 from lsm6dsox import LSM6DSOX
-from micropython import const
+from micropython import const, alloc_emergency_exception_buf
 from machine import Pin, SPI, I2C
 import asyncio
 import aioble
 import bluetooth
 import struct
+
+# If an error occurs in an ISR, MicroPython is unable to produce an error
+# report unless a special buffer is created for the purpose.
+alloc_emergency_exception_buf(100)
 
 led_pin = 6
 led = Pin(led_pin, Pin.OUT)
@@ -44,7 +48,7 @@ led_on = 0
 button_pin = 19
 button = Pin(button_pin, Pin.IN, Pin.PULL_UP)
 
-pixels_button_pin = 16
+pixels_button_pin = 17
 pixels_button = Pin(pixels_button_pin, Pin.IN, Pin.PULL_UP)
 
 # Increase to make Alvik run faster
@@ -87,44 +91,38 @@ lsm = LSM6DSOX(I2C(0, scl=Pin(13), sda=Pin(12)))
 def _encode_data(data):
     return int(data).to_bytes(2, 'little')
 
-# If acceleration is under a certain threshold, it stops Alvik
-# This prevents small movements when the controller is
+# If acceleration is under a certain threshold, Alvik must stop
+# This prevents small movements when the controller is almost horizontal 
 def normalize_accel(accel):
     accel = accel * SPEED_FACTOR
     if abs(accel) > SENSITIVITY_THRESHOLD:
         return accel
     return 0
     
+def handle_button_press(pin):
+    button_pressed = pin.value()
+    if button_pressed == 0:
+        horn_characteristic.write(_encode_data(1), send_update=True)
+        led.value(1)
+    else:
+        horn_characteristic.write(_encode_data(0), send_update=True)
+        led.value(0)
+    print('Horn sent to central: ', 1 if button_pressed == 0 else 0)
+        
+def handle_pixels_button_press(pin):
+    button_pressed = pin.value()
+    if button_pressed == 0:
+        pixels_characteristic.write(_encode_data(1), send_update=True)
+        led.value(1)
+    else:
+        pixels_characteristic.write(_encode_data(0), send_update=True)
+        led.value(0)
+    print('Pixels sent to central: ', 1 if button_pressed == 0 else 0)
 
-# Controls the button to honk Alvik's horn
-# Writes 0 or 1 to central, by updating the horn characteristic
-async def button_task():
-    while True:
-        button_pressed = button.value() == 0
-        if button_pressed:
-            led.value(1)
-            horn_characteristic.write(_encode_data(1), send_update=True)
-        else:
-            led.value(0)
-            horn_characteristic.write(_encode_data(0), send_update=True)
 
-        print('Horn sent to central: ', button_pressed)
-        await asyncio.sleep_ms(100)
-
-
-# Writes 0 or 1 to central, by updating the horn characteristic
-async def pixels_task():
-    while True:
-        button_pressed = pixels_button.value() == 0
-        if button_pressed:
-            led.value(1)
-            pixels_characteristic.write(_encode_data(1), send_update=True)
-        else:
-            led.value(0)
-            pixels_characteristic.write(_encode_data(0), send_update=True)
-
-        print('Pixels sent to central: ', button_pressed)
-        await asyncio.sleep_ms(100)
+# Interrupts on buttons, to send the correponding characteristic to Alvik
+button.irq(trigger=Pin.IRQ_FALLING | Pin.IRQ_RISING, handler=handle_button_press)
+pixels_button.irq(trigger=Pin.IRQ_FALLING | Pin.IRQ_RISING, handler=handle_pixels_button_press)
 
 # Controls Alvik's speed.
 # Writes current speed to central, by updating the speed characteristic
@@ -136,8 +134,7 @@ async def speed_task():
         dir = normalize_accel(dir)
         speed_characteristic.write(_encode_data(speed), send_update=True)
         steering_characteristic.write(_encode_data(dir), send_update=True)
-        print('Speed sent to central: ', speed, dir)
-        await asyncio.sleep_ms(200)
+        await asyncio.sleep_ms(100)
         
         
 # Creates a connection with Alvik
@@ -164,9 +161,9 @@ async def peripheral_task():
 async def main():
     t1 = asyncio.create_task(peripheral_task())
     t2 = asyncio.create_task(speed_task())
-    t3 = asyncio.create_task(button_task())
-    t4 = asyncio.create_task(pixels_task())
+    # t3 = asyncio.create_task(button_task())
+    # t4 = asyncio.create_task(pixels_task())
     
-    await asyncio.gather(t1, t2, t3, t4)
+    await asyncio.gather(t1, t2)
     
 asyncio.run(main())
