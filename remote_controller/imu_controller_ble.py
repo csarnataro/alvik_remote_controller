@@ -51,13 +51,10 @@ button = Pin(button_pin, Pin.IN, Pin.PULL_UP)
 pixels_button_pin = 17
 pixels_button = Pin(pixels_button_pin, Pin.IN, Pin.PULL_UP)
 
-# Increase to make Alvik run faster
-SPEED_FACTOR = 100
-
 # Under a certains threshold, close to zero, Alvik should stop.
 # This will prevent small movements when the IMU will detect very
 # small accelerations, e.g. when you keep the controller in your hands
-SENSITIVITY_THRESHOLD = 5 
+SENSITIVITY_THRESHOLD = 0.04
 
 
 # This is the name used to pair with Alvik's Bluetooth
@@ -92,12 +89,12 @@ def _encode_data(data):
     return int(data).to_bytes(2, 'little')
 
 # If acceleration is under a certain threshold, Alvik must stop
-# This prevents small movements when the controller is almost horizontal 
+# This prevents small movements when the controller is almost horizontal
+# For simplicity, I'm sending an integer = accel (e.g. 0.24) multiplied by 100
 def normalize_accel(accel):
-    accel = accel * SPEED_FACTOR
-    if abs(accel) > SENSITIVITY_THRESHOLD:
-        return accel
-    return 0
+    accel = int(100 * accel) if abs(accel) > SENSITIVITY_THRESHOLD else 0
+    print("Accel: ", accel)
+    return accel
     
 def handle_button_press(pin):
     button_pressed = pin.value()
@@ -132,6 +129,8 @@ async def speed_task():
         (dir, speed, _) = lsm.accel()
         speed = normalize_accel(speed)
         dir = normalize_accel(dir)
+        print("Speed: ", speed)
+        print("Direction: ", dir)        
         speed_characteristic.write(_encode_data(speed), send_update=True)
         steering_characteristic.write(_encode_data(dir), send_update=True)
         await asyncio.sleep_ms(100)
