@@ -1,3 +1,26 @@
+"""
+Arduino Alvik robot, controlled via Bluetooth Low Energy (BLE)
+
+It receives 4 'characteristics':
+- speed: floating point, proportional to the speed, forwards and back.
+- direction: floating point, proportional to left/right direction. 0 means 'straight'
+- horn: 0 or 1, it plays a sound with the Modulino Buzzer
+- pixels: 0 or 1, it makes the Modulino Pixels blink
+
+
+Technical details:
+The `asyncio` library is used for managing different tasks in an
+asynchronous and independente fashion, so that, for example,
+when you honk Alvik's horn, you can still control the speed of the wheels.
+
+The `aioble` library is used to manage the BLE service and all related characteristics.
+
+"""
+__author__ = "Christian Sarnataro"
+__license__ = "MIT License"
+__version__ = "1.0.0"
+
+
 import network
 import sys
 from machine import I2C, Pin
@@ -24,7 +47,7 @@ _BLE_PIXELS_UUID = bluetooth.UUID('19b10005-e8f2-537e-4f6c-d104768a1214')
 left_speed = 0
 right_speed = 0
 # Increase to make Alvik run faster, but harder to control
-SPEED_FACTOR = 0.7
+SPEED_FACTOR = 1.5
 
 
 # Initialize Alvik
@@ -45,7 +68,7 @@ def _decode_data(data):
             number = ustruct.unpack("<h", data)[0]
             return number
     except Exception as e:
-        print("Error decoding temperature:", e)
+        print("Error decoding data:", e)
         return None
 
 async def find_tx_device():
